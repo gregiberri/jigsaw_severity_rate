@@ -28,10 +28,6 @@ class Solver(ABC):
         # initialize the required elements for the ml problem
         self.init_results_dir()
         self.init_dataloaders()
-        self.init_tokenizer()
-        self.init_vectorizer()
-
-        self.tokenize()
 
         self.init_model()
         # self.load_model()
@@ -40,36 +36,6 @@ class Solver(ABC):
         self.result_dir = os.path.join(self.config.env.result_dir, self.config.id, self.args.id_tag)
         if not os.path.exists(self.result_dir):
             os.makedirs(self.result_dir)
-
-    def init_tokenizer(self):
-        """
-        Initialize the tokenizer according to the config.
-        """
-        logging.info("Initializing the tokenizer.")
-        self.tokenizer = get_tokenizer(self.config.tokenizer, self.train_loader.dataset.inputs)
-
-    def init_vectorizer(self):
-        """
-        Initializer the vectorizer according to the config.
-        """
-        logging.info(f'Initializing the vectorizer.')
-        self.vectorizer = TfidfVectorizer(analyzer='word',  # todo place it to somewhere else
-                                          tokenizer=lambda x: x,
-                                          preprocessor=lambda x: x,
-                                          token_pattern=None)
-
-    def tokenize(self):
-        logging.info('Tokenizing.')
-        tokenized_comments = self.tokenizer(list(self.train_loader.dataset.inputs))['input_ids']
-        self.train_loader.dataset.inputs = self.vectorizer.fit_transform(tokenized_comments)
-
-        tokenized_comments_less = self.tokenizer(list(self.val_loader.dataset.inputs[0]))['input_ids']
-        tokenized_comments_more = self.tokenizer(list(self.val_loader.dataset.inputs[1]))['input_ids']
-        self.val_loader.dataset.inputs = self.vectorizer.transform(tokenized_comments_less), \
-                                         self.vectorizer.transform(tokenized_comments_more)
-
-        # tokenized_comments = self.tokenizer(list(self.test_loader.dataset.inputs))['input_ids']
-        # self.train_loader.dataset.inputs = self.vectorizer.fit_transform(tokenized_comments)
 
     def init_model(self):
         """

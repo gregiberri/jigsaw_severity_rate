@@ -24,6 +24,8 @@ def get_tokenizer(config, train_dataset):
                                        cls_token="[CLS]",
                                        sep_token="[SEP]",
                                        mask_token="[MASK]")
+    elif config.name is None:
+        return lambda x: x
     else:
         raise ValueError(f'Wrong model name in model configs: {config.name}')
 

@@ -1,4 +1,4 @@
-# JIgsaw Severity Rating
+# Jigsaw Severity Rating
 ### Introduction
 The main goal of this code is to make a model that is able to predict the 
 severity score of comments.

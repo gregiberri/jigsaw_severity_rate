@@ -29,22 +29,29 @@ data:
     gpu_to_use: 0
     workers: 8
     load_into_memory: false
-tokenizer:
-  name: "WordPiece"
-  params:
-    unk_token: "[UNK]"
-  normalizer:
-    name: "BertNormalizer"
-    params:
-      lowercase: True
-  pre_tokenizer:
-    name: "BertPreTokenizer"
-    params: {}
-  trainer:
-    name: "WordPieceTrainer"
-    params:
-      vocab_size: 25000
-      special_tokens: ["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
+
+    tokenizer:
+      name: "WordPiece"
+      params:
+        unk_token: "[UNK]"
+
+      normalizer:
+        name: "BertNormalizer"
+        params:
+          lowercase: True
+
+      pre_tokenizer:
+        name: "BertPreTokenizer"
+        params: {}
+
+      trainer:
+        name: "WordPieceTrainer"
+        params:
+          vocab_size: 25000
+          special_tokens: ["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
+
+    vectorizer:
+      name: 'TfidfVectorizer'
 
 model:
   name: "Ridge"

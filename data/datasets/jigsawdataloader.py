@@ -1,20 +1,29 @@
 import logging
 import os
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
 from torch.utils.data import Dataset
+
+from ml.tokenizers import get_tokenizer
+from ml.vectorizers import get_vectorizer
 
 
 class JigsawDataloader(Dataset):
     """
     Dataloader to load the traffic signs.
     """
+    tokenizer = None
+    vectorizer = None
+
     def __init__(self, config, split):
         self.config = config
         self.split = split
 
         self.df = self.load_data()
         self.make_inputs_outputs()
+        self.init_tokenizer()
+        self.init_vectorizer()
+        self.tokenize()
 
     @property
     def data(self):
@@ -69,5 +78,40 @@ class JigsawDataloader(Dataset):
             self.id = self.df['comment_id']
             self.inputs = self.df['text']
             self.outputs = None
+        else:
+            raise ValueError(f'Wrong split: {self.split}')
+
+    def init_tokenizer(self):
+        """
+        Initialize the tokenizer according to the config.
+        """
+        logging.info("Initializing the tokenizer.")
+        if self.split == 'train':
+            JigsawDataloader.tokenizer = get_tokenizer(self.config.tokenizer, self.inputs)
+        elif JigsawDataloader.tokenizer is None:
+            raise NotImplementedError()
+
+    def init_vectorizer(self):
+        """
+        Initializer the vectorizer according to the config.
+        """
+        logging.info(f'Initializing the vectorizer.')
+        if self.split == 'train':
+            JigsawDataloader.vectorizer = get_vectorizer(self.config.vectorizer)
+        elif JigsawDataloader.vectorizer is None:
+            raise NotImplementedError()
+
+    def tokenize(self):
+        if self.split == 'train':
+            tokenized_comments = JigsawDataloader.tokenizer(list(self.inputs))['input_ids']
+            self.inputs = JigsawDataloader.vectorizer.fit_transform(tokenized_comments)
+        elif self.split == 'val':
+            tokenized_comments_less = JigsawDataloader.tokenizer(list(self.inputs[0]))['input_ids']
+            tokenized_comments_more = JigsawDataloader.tokenizer(list(self.inputs[1]))['input_ids']
+            self.inputs = JigsawDataloader.vectorizer.transform(tokenized_comments_less), \
+                          JigsawDataloader.vectorizer.transform(tokenized_comments_more)
+        elif self.split == 'test':
+            tokenized_comments = JigsawDataloader.tokenizer(list(self.inputs))['input_ids']
+            self.inputs = JigsawDataloader.vectorizer.fit_transform(tokenized_comments)
         else:
             raise ValueError(f'Wrong split: {self.split}')
