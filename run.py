@@ -24,7 +24,6 @@ parser.add_argument('--mode', type=str, default='train', choices=['train', 'val'
                     help='The mode of the running.')
 parser.add_argument('-c', '--config', type=str, default='base', help='Config file name')
 parser.add_argument('--save_preds', action='store_true')
-parser.add_argument('-v', '--visualize', action='store_true')
 
 args = parser.parse_args()
 
