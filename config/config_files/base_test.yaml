@@ -1,0 +1,8 @@
+id: "base"
+base_config: 'base'
+data:
+  params:
+    dataset_path: '/datasets/cat_data_test'
+model:
+  params:
+    pretrained: false
