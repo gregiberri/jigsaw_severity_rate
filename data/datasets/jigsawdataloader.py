@@ -1,11 +1,14 @@
 import logging
 import os
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 from torch.utils.data import Dataset
+import numpy as np
 
+from data.utils.clean_text import clean
 from ml.tokenizers import get_tokenizer
 from ml.vectorizers import get_vectorizer
+from tqdm.auto import tqdm
+tqdm.pandas()
 
 
 class JigsawDataloader(Dataset):
@@ -28,6 +31,19 @@ class JigsawDataloader(Dataset):
     @property
     def data(self):
         return self.inputs, self.outputs
+
+    def __getitem__(self, index):
+        if self.split == 'train':
+            return {"id": self.id[index],
+                    'ids': self.inputs[index],
+                    "mask": self.attention_masks[index],
+                    'labels': self.outputs}
+        elif self.split == 'val' or self.split == 'test':
+            return {"id": self.id[index],
+                    'ids': self.inputs[index],
+                    "mask": self.attention_masks[index]}
+        else:
+            raise ValueError(f'Wrong split: {self.split}')
 
     def __len__(self):
         return len(self.id)
@@ -66,20 +82,32 @@ class JigsawDataloader(Dataset):
         Make the inputs and the outputs according to the current split.
         """
         if self.split == 'train':
-            self.id = self.df['id']
+            self.id = self.df['id'].to_numpy()
             self.inputs = self.df['comment_text']
             self.make_outputs()
-            self.outputs = self.df['y']
+            self.outputs = self.df['y'].to_numpy()
         elif self.split == 'val':  # todo: change it
-            self.id = None
+            self.id = [None] * len(self.df)
             self.inputs = self.df['less_toxic'], self.df['more_toxic']
-            self.outputs = None
+            self.outputs = [None] * len(self.df)
         elif self.split == 'test':
-            self.id = self.df['comment_id']
+            self.id = self.df['comment_id'].to_numpy()
             self.inputs = self.df['text']
-            self.outputs = None
+            self.outputs = [None] * len(self.df)
         else:
             raise ValueError(f'Wrong split: {self.split}')
+
+        self.clean_text()
+
+    def clean_text(self):
+        if self.config.clean_text:
+            if self.split == 'train' or self.split == 'test':
+                self.inputs = self.inputs.progress_apply(clean)
+            elif self.split == 'val':  # todo: change it
+                self.inputs = self.inputs[0].progress_apply(clean), \
+                              self.inputs[0].progress_apply(clean)
+            else:
+                raise ValueError(f'Wrong split: {self.split}')
 
     def init_tokenizer(self):
         """
@@ -103,15 +131,27 @@ class JigsawDataloader(Dataset):
 
     def tokenize(self):
         if self.split == 'train':
-            tokenized_comments = JigsawDataloader.tokenizer(list(self.inputs))['input_ids']
+            tokenized = JigsawDataloader.tokenizer(list(self.inputs),
+                                                   **self.config.tokenizer.tokenize_params.dict())
+            tokenized_comments = np.array(tokenized['input_ids'])
+            self.attention_masks = np.array(tokenized['attention_mask'])
             self.inputs = JigsawDataloader.vectorizer.fit_transform(tokenized_comments)
         elif self.split == 'val':
-            tokenized_comments_less = JigsawDataloader.tokenizer(list(self.inputs[0]))['input_ids']
-            tokenized_comments_more = JigsawDataloader.tokenizer(list(self.inputs[1]))['input_ids']
+            tokenized_less = JigsawDataloader.tokenizer(list(self.inputs[0]),
+                                                        **self.config.tokenizer.tokenize_params.dict())
+            tokenized_comments_less = np.array(tokenized_less['input_ids'])
+            self.attention_masks = np.array(tokenized_less['attention_mask'])
+            tokenized_more = JigsawDataloader.tokenizer(list(self.inputs[1]),
+                                                        **self.config.tokenizer.tokenize_params.dict())
+            tokenized_comments_more = np.array(tokenized_more['input_ids'])
+            self.attention_masks = np.array(tokenized_more['attention_mask'])
             self.inputs = JigsawDataloader.vectorizer.transform(tokenized_comments_less), \
                           JigsawDataloader.vectorizer.transform(tokenized_comments_more)
         elif self.split == 'test':
-            tokenized_comments = JigsawDataloader.tokenizer(list(self.inputs))['input_ids']
-            self.inputs = JigsawDataloader.vectorizer.fit_transform(tokenized_comments)
+            tokenized = JigsawDataloader.tokenizer(list(self.inputs),
+                                                   **self.config.tokenizer.tokenize_params.dict())
+            tokenized_comments = np.array(tokenized['input_ids'])
+            self.attention_masks = np.array(tokenized['attention_mask'])
+            self.inputs = JigsawDataloader.vectorizer.transform(tokenized_comments)
         else:
             raise ValueError(f'Wrong split: {self.split}')
