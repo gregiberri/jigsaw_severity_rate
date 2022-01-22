@@ -3,11 +3,8 @@ import os
 from abc import ABC
 import logging
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-
 from data.datasets import get_dataloader
 from ml.models import get_model
-from ml.tokenizers import get_tokenizer
 
 
 class Solver(ABC):
@@ -30,7 +27,6 @@ class Solver(ABC):
         self.init_dataloaders()
 
         self.init_model()
-        # self.load_model()
 
     def init_results_dir(self):
         self.result_dir = os.path.join(self.config.env.result_dir, self.config.id, self.args.id_tag)

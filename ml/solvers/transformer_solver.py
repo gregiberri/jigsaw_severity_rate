@@ -10,13 +10,13 @@ from data.datasets import get_dataloader
 from ml.models import get_model
 from ml.modules.losses import get_loss
 from ml.optimizers import get_optimizer, get_lr_policy, get_lr_policy_parameter
-from ml.visualizer.visualizer import Visualizer
+from ml.solvers.base_solver import Solver
 from utils.device import DEVICE, put_minibatch_to_device
+from utils.get_model_inputs import get_model_inputs
 from utils.iohandler import IOHandler
 
 
-class MLSolver(object):
-
+class TransformerSolver(Solver):
     def __init__(self, config, args):
         """
         Solver parent function to control the experiments.
@@ -25,21 +25,16 @@ class MLSolver(object):
         :param config: config namespace containing the experiment configuration
         :param args: arguments of the training
         """
-        self.args = args
-        self.phase = args.mode
-        self.config = config
+        super(TransformerSolver, self).__init__(config, args)
 
-        # initialize the required elements for the ml problem
+        # deep learn specific stuff
         self.init_epochs()
-        self.init_dataloaders()
-        self.init_model()
+        if DEVICE == torch.device('cuda'): self.model.cuda()
         self.init_loss()
         self.init_optimizer()
         self.init_lr_policy()
         self.iohandler = IOHandler(args, self)
-        self.visualizer = Visualizer(self.model,
-                                     self.config.visualizer,
-                                     self.iohandler.result_dir)
+        # self.load_model()  # todo
 
     def init_epochs(self):
         """
@@ -48,15 +43,6 @@ class MLSolver(object):
         logging.info("Initializing the epoch number.")
         self.epoch = 0
         self.epochs = self.config.env.epochs
-
-    def init_model(self):
-        """
-        Initialize the model according to the config and put it on the gpu if available,
-        (weights can be overwritten during checkpoint load).
-        """
-        logging.info("Initializing the model.")
-        self.model = get_model(self.config.model)
-        if DEVICE == torch.device('cuda'): self.model.cuda()
 
     def init_loss(self):
         """
@@ -82,35 +68,6 @@ class MLSolver(object):
             logging.info("Initializing lr policy.")
             self.lr_policy = get_lr_policy(self.config.lr_policy, optimizer=self.optimizer)
 
-    def init_dataloaders(self):
-        """
-        Dataloader initialization(s) for train, val and test dataset according to the config.
-        """
-        logging.info("Initializing dataloaders.")
-        if self.phase == 'train':
-            self.train_loader = get_dataloader(self.config.data, 'train')
-            self.val_loader = get_dataloader(self.config.data, 'val')
-        elif self.phase == 'val' or self.phase == 'test':
-            self.val_loader = get_dataloader(self.config.data, self.phase)
-        else:
-            raise ValueError(f'Wrong mode argument: {self.phase}. It should be `train`, `val` or `test`.')
-
-    def run(self):
-        """
-        Run the experiment.
-        :return: the best goal metrics (as stated in config.metrics.goal_metric).
-        """
-        logging.info("Starting experiment.")
-        if self.phase == 'train':
-            self.train()
-        elif self.phase == 'val' or self.phase == 'test':
-            self.eval()
-        else:
-            raise ValueError(f'Wrong phase: {self.phase}. It should be `train`, `val` or `test`.')
-
-        logging.info(f'Max result: {self.iohandler.get_max_metric()}')
-        return self.iohandler.get_max_metric()
-
     def train(self):
         """
         Training all the epochs with validation after every epoch.
@@ -126,7 +83,7 @@ class MLSolver(object):
 
             self.lr_policy.step(*get_lr_policy_parameter(self))
             self.iohandler.save_best_checkpoint()
-        self.iohandler.writer.close()
+            self.train_loader.dataset.sample_classes()
 
     def eval(self):
         """
@@ -134,7 +91,10 @@ class MLSolver(object):
         """
         self.current_mode = 'val'
         self.run_epoch()
-        if self.args.save_preds: self.iohandler.save_results_csv()
+        self.accuracy = self.iohandler.calculate_metric()
+        print(self.accuracy)
+        self.save_acc()
+        # if self.args.save_preds: self.iohandler.save_results_csv()  # todo
 
     def before_epoch(self):
         """
@@ -145,7 +105,6 @@ class MLSolver(object):
         if self.current_mode == 'train':
             self.model.train()
             self.loader = self.train_loader
-            self.loader.dataset.sample_classes()
             self.iohandler.train()
         elif self.current_mode == 'val':
             self.model.eval()
@@ -175,8 +134,8 @@ class MLSolver(object):
                 train_time = time.time() - train_t_start
 
                 # save results for evaluation at the end of the epoch and calculate the running metrics
-                self.iohandler.append_results(minibatch, output)
-                self.iohandler.calculate_iteration_metrics(minibatch, output, loss, pbar, preproc_time, train_time, idx)
+                self.iohandler.append_data(minibatch, output)
+                self.iohandler.update_bar_description(pbar, idx, preproc_time, train_time, loss)
 
                 pbar.update(1)
                 preproc_t_start = time.time()
@@ -191,20 +150,29 @@ class MLSolver(object):
         :return: output, loss
         """
         # prediction
-
         if self.current_mode == 'train':
-            output = self.model(minibatch['input_images'])
+            output = self.model(**get_model_inputs(self.model, minibatch))
+
             # training step
             self.optimizer.zero_grad()
-            loss = self.loss(output, minibatch['labels_one_hot'])
+            loss = self.loss(output, minibatch['labels'].unsqueeze(-1))
             loss.backward()
             self.optimizer.step()
+
+            output = {'output': output}
         else:
             with torch.no_grad():
-                output = self.model(minibatch['input_images'])
+                if self.current_mode == 'val':
+                    model_inputs = get_model_inputs(self.model, minibatch)
+                    less_output = self.model(**{key: value[:, 0] for key, value in model_inputs.items()})
+                    more_output = self.model(**{key: value[:, 1] for key, value in model_inputs.items()})
+                    output = {'less_output': less_output, 'more_output': more_output}
+                elif self.current_mode == 'test':
+                    output = self.model(**get_model_inputs(self.model, minibatch))
+                    output = {'output': output}
+                else:
+                    raise ValueError(f'Wrong current mode: {self.current_mode}')
             loss = 0
-            if self.args.visualize and self.phase == 'val':
-                self.visualizer.visualize(minibatch['input_images'], minibatch['paths'][0])
 
         return output, loss
 
@@ -212,7 +180,6 @@ class MLSolver(object):
         """
         After every epoch collect some garbage and evaluate the current metric.
         """
-        self.iohandler.compute_epoch_metric()
         gc.collect()
         torch.cuda.empty_cache()
         print()

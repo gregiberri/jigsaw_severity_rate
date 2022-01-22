@@ -2,13 +2,13 @@ id: "sklearn"
 env:
   result_dir: 'results'
   random_seed: 0
-  epochs: 10
   solver: 'sklearn-solver'
 data:
   name: "jigsaw_dataset"
   params:
     dataset_path: '/home/albert/data/jigsaw'
     test_filename: 'comments_to_score.csv'
+    batch_size: 1
 
     category_weights:
       'obscene': 0.16
@@ -22,7 +22,7 @@ data:
     workers: 8
     load_into_memory: false
 
-    clean_text: True
+    clean_text: False
 
     tokenizer:
       name: "WordPiece"
@@ -30,10 +30,10 @@ data:
       params:
         unk_token: "[UNK]"
       tokenize_params:
-        truncation: True
-        add_special_tokens: True
-        max_length: 128
-        padding: 'max_length'
+        truncation: False
+        add_special_tokens: False
+        max_length: null
+        padding: False
 
       normalizer:
         name: "BertNormalizer"
@@ -53,7 +53,16 @@ data:
     vectorizer:
       name: 'TfidfVectorizer'
 
+#model:
+#  name: "Ridge"
+#  pretrained: False
+#  params:
+#    alpha: 0.8
+
 model:
-  name: "Ridge"
+  name: "XGBRegressor"
+  pretrained: False
   params:
-    alpha: 0.8
+    params:
+      max_depth: 6
+      n_estimators: 100

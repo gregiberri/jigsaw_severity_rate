@@ -44,14 +44,4 @@ dependencies:
       - HEBO
       - nevergrad
       - scikit-optimize
-
-
-
-
-
-
-
-
-
-
-
+      - lxml

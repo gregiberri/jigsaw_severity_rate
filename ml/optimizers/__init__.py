@@ -49,6 +49,6 @@ def get_lr_policy_parameter(solver):
     """
 
     if solver.lr_policy.__class__.__name__ == 'ReduceLROnPlateau':
-        return [solver.iohandler.val_metric.epoch_results[solver.config.metrics.goal_metric][-1]]
+        return [solver.accuracy]
     else:
         return [solver.epoch]

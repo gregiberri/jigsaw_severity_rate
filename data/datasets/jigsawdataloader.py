@@ -28,6 +28,12 @@ class JigsawDataloader(Dataset):
         self.init_vectorizer()
         self.tokenize()
 
+        # undersample the overpresented, and oversample the underpresented classes
+        if self.split == 'train':
+            self.old_id, self.old_inputs, self.old_attention_masks, self.old_outputs = \
+                self.id, self.inputs, self.attention_masks, self.outputs
+            self.sample_classes()
+
     @property
     def data(self):
         return self.inputs, self.outputs
@@ -37,7 +43,7 @@ class JigsawDataloader(Dataset):
             return {"id": self.id[index],
                     'ids': self.inputs[index],
                     "mask": self.attention_masks[index],
-                    'labels': self.outputs}
+                    'labels': self.outputs[index]}
         elif self.split == 'val' or self.split == 'test':
             return {"id": self.id[index],
                     'ids': self.inputs[index],
@@ -60,7 +66,7 @@ class JigsawDataloader(Dataset):
         elif self.split == 'train':
             filepath = os.path.join(self.config.dataset_path, 'train.csv')
         elif self.split == 'test':
-            filepath = os.path.join(self.config.dataset_path, self.config.test_filename)
+            filepath = os.path.join(self.config.dataset_path, 'comments_to_score.csv')
         else:
             raise ValueError(f'Wrong split: {self.split}.')
 
@@ -86,14 +92,12 @@ class JigsawDataloader(Dataset):
             self.inputs = self.df['comment_text']
             self.make_outputs()
             self.outputs = self.df['y'].to_numpy()
-        elif self.split == 'val':  # todo: change it
-            self.id = [None] * len(self.df)
+        elif self.split == 'val':
+            self.id = [0] * len(self.df)
             self.inputs = self.df['less_toxic'], self.df['more_toxic']
-            self.outputs = [None] * len(self.df)
         elif self.split == 'test':
             self.id = self.df['comment_id'].to_numpy()
             self.inputs = self.df['text']
-            self.outputs = [None] * len(self.df)
         else:
             raise ValueError(f'Wrong split: {self.split}')
 
@@ -104,8 +108,8 @@ class JigsawDataloader(Dataset):
             if self.split == 'train' or self.split == 'test':
                 self.inputs = self.inputs.progress_apply(clean)
             elif self.split == 'val':  # todo: change it
-                self.inputs = self.inputs[0].progress_apply(clean), \
-                              self.inputs[0].progress_apply(clean)
+                self.inputs = self.inputs[:, 0].progress_apply(clean), \
+                              self.inputs[:, 1].progress_apply(clean)
             else:
                 raise ValueError(f'Wrong split: {self.split}')
 
@@ -140,13 +144,15 @@ class JigsawDataloader(Dataset):
             tokenized_less = JigsawDataloader.tokenizer(list(self.inputs[0]),
                                                         **self.config.tokenizer.tokenize_params.dict())
             tokenized_comments_less = np.array(tokenized_less['input_ids'])
-            self.attention_masks = np.array(tokenized_less['attention_mask'])
+            tokenized_comments_less = JigsawDataloader.vectorizer.transform(tokenized_comments_less)
+            attention_masks_less = np.array(tokenized_less['attention_mask'])
             tokenized_more = JigsawDataloader.tokenizer(list(self.inputs[1]),
                                                         **self.config.tokenizer.tokenize_params.dict())
             tokenized_comments_more = np.array(tokenized_more['input_ids'])
-            self.attention_masks = np.array(tokenized_more['attention_mask'])
-            self.inputs = JigsawDataloader.vectorizer.transform(tokenized_comments_less), \
-                          JigsawDataloader.vectorizer.transform(tokenized_comments_more)
+            tokenized_comments_more = JigsawDataloader.vectorizer.transform(tokenized_comments_more)
+            attention_masks_more = np.array(tokenized_more['attention_mask'])
+            self.attention_masks = np.array(list(zip(attention_masks_less, attention_masks_more)))
+            self.inputs = np.array(list(zip(tokenized_comments_less, tokenized_comments_more)))
         elif self.split == 'test':
             tokenized = JigsawDataloader.tokenizer(list(self.inputs),
                                                    **self.config.tokenizer.tokenize_params.dict())
@@ -155,3 +161,34 @@ class JigsawDataloader(Dataset):
             self.inputs = JigsawDataloader.vectorizer.transform(tokenized_comments)
         else:
             raise ValueError(f'Wrong split: {self.split}')
+
+    def sample_classes(self):
+        """
+        Make the over or undersampling. This should be rerun after every epoch for
+        new samples to use all the samples from the dataset.
+        """
+        logging.info('Resampling dataset to have equal positives and negatives.')
+
+        if not self.config.balanced_classes and self.split == 'train':
+            return
+
+        istoxic = (self.df.loc[:, 'toxic':'identity_hate'].sum(1) > 0).astype(int)
+
+        id, inputs, attention_masks, outputs = [], [], [], []
+
+        for class_number in range(2):
+            class_mask = istoxic == class_number
+
+            masked_id = self.old_id[class_mask]
+            masked_inputs = self.old_inputs[class_mask]
+            masked_attention_masks = self.old_attention_masks[class_mask]
+            masked_outputs = self.old_outputs[class_mask]
+
+            chosen_indices = np.random.choice(np.arange(len(masked_inputs)), size=25000)
+
+            id.extend(masked_id[chosen_indices])
+            inputs.extend(masked_inputs[chosen_indices])
+            attention_masks.extend(masked_attention_masks[chosen_indices])
+            outputs.extend(masked_outputs[chosen_indices])
+
+        self.id, self.inputs, self.attention_masks, self.outputs = id, inputs, attention_masks, outputs

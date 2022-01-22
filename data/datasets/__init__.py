@@ -11,7 +11,7 @@ def get_dataloader(data_config, mode):
         raise ValueError(f'Wrong dataset name: {data_config.name}')
 
     # batch size 1 for validation
-    batch_size = int(data_config.params.batch_size) if 'train' in mode else 1
+    batch_size = 1 if 'test' in mode else int(data_config.params.batch_size)
 
     # make the torch dataloader object
     loader = DataLoader(dataset,  # todo

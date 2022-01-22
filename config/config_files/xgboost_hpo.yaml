@@ -1,0 +1,21 @@
+id: "xgboost_hpo"
+base_config: 'sklearn'
+hpo:
+  num_samples: 100
+  cpu_per_trial: 6
+  gpu_per_trial: 0.01
+  hpo_algorithm:
+    name: 'SkOptSearch'
+    params:
+      mode: 'max'
+
+model:
+  name: "XGBRegressor"
+  pretrained: False
+  params:
+    learning_rate: ['uniform', [0.01, 1]]
+    gamma: ['uniform', [0, 2]]
+    n_estimators: ['uniform', [5, 1000]]
+    max_depth: ['uniform', [1, 100]]
+    min_child_weight: ['uniform', [0, 10]]
+    lambda: ['uniform', [0.5, 2]]

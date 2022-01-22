@@ -9,7 +9,7 @@ import argparse
 import logging
 from config import ConfigNamespace
 from ml.solvers.hpo_solver import HPOSolver
-from ml.solvers.ml_solver import MLSolver
+from ml.solvers.transformer_solver import TransformerSolver
 from ml.solvers.sklearn_solver import SKLearnSolver
 from utils.device import DEVICE
 from utils.init_random_seeds import set_random_seed
@@ -37,7 +37,9 @@ if __name__ == '__main__':
         solver = HPOSolver(config, args)
     elif config.env.solver == 'sklearn-solver':
         solver = SKLearnSolver(config, args)
+    elif config.env.solver == 'transformer-solver':
+        solver = TransformerSolver(config, args)
     else:
-        solver = MLSolver(config, args)
+        raise ValueError(f'Wrong solver config: {config.env.solver}')
 
     solver.run()

@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from config import ConfigNamespace
 from ml.hpo import get_hpo_algorithm
-from ml.solvers.ml_solver import MLSolver
+from ml.solvers import get_solver
 
 
 class HPOSolver(object):
@@ -85,7 +85,7 @@ class HPOSolver(object):
         config.id = os.path.join(config.id, 'hpo_outputs')
 
         with suppress_stdout():  # do not print out the Solvers` output
-            solver = MLSolver(config, args)
+            solver = get_solver(config, args)
             metric = solver.run()
 
         tune.report(metric)

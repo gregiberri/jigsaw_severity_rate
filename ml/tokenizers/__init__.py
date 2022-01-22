@@ -1,5 +1,5 @@
 from tokenizers import models, normalizers, pre_tokenizers, trainers, Tokenizer
-from transformers import PreTrainedTokenizerFast
+from transformers import PreTrainedTokenizerFast, AutoTokenizer
 
 
 def get_tokenizer(config, train_dataset):
@@ -10,8 +10,9 @@ def get_tokenizer(config, train_dataset):
     :param train_dataset: train dataset containing the training text
     :return: tokenizer
     """
-
-    if hasattr(models, config.name):
+    if config.pretrained:
+        return AutoTokenizer.from_pretrained(config.name)
+    elif hasattr(models, config.name):
         function = getattr(models, config.name)
         raw_tokenizer = Tokenizer(function(**config.params.dict()))
         raw_tokenizer.normalizer = get_normalizer(config.normalizer)

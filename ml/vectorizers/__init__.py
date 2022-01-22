@@ -1,6 +1,14 @@
 from sklearn.feature_extraction import text
 
 
+class EmptyVectorizer:
+    def fit_transform(self, input):
+        return input
+
+    def transform(self, input):
+        return input
+
+
 def get_vectorizer(config):
     """
     Select the vectorizer according to the config name and its parameters
@@ -9,13 +17,13 @@ def get_vectorizer(config):
     :return: tokenizer
     """
 
-    if hasattr(text, config.name):
+    if config is None:
+        return EmptyVectorizer()
+    elif hasattr(text, config.name):
         function = getattr(text, config.name)
-        return function(analyzer='word',  # todo place it to somewhere else
+        return function(analyzer='word',  # todo dynamic with config file
                         tokenizer=lambda x: x,
                         preprocessor=lambda x: x,
                         token_pattern=None)
-    elif config.name is None:
-        return lambda x: x
     else:
         raise ValueError(f'Wrong model name in model configs: {config.name}')
