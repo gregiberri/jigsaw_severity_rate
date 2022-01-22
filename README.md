@@ -1,7 +1,9 @@
 # Jigsaw Severity Rating
 ### Introduction
 The main goal of this code is to make a model that is able to predict the 
-severity score of comments.
+severity score of comments. It was made for kaggle's 
+[Jigsaw Rate Severity of Toxic Comments](https://www.kaggle.com/c/jigsaw-toxic-severity-rating) 
+challenge.
 
 ### Requirements
 The required packages can be found in *config/env_files/jigsaw_env.yml*. 
