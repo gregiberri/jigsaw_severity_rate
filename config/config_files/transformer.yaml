@@ -1,4 +1,4 @@
-id: "bert"
+id: "transformer"
 env:
   result_dir: 'results'
   random_seed: 0
@@ -24,10 +24,10 @@ data:
     workers: 0
     load_into_memory: false
 
-    clean_text: False
+    clean_text: false
 
     tokenizer:
-      name: 'bert-base-cased'
+      name: 'bert-base-uncased'
       pretrained: True
       tokenize_params:
         truncation: True
@@ -42,17 +42,17 @@ model:
   pretrained: True
 
 loss:
-  name: 'L1Loss'
+  name: 'MSELoss'
   params: {}
 
 optimizer:
   name: 'RAdam'
   params:
-    lr: 0.00001
+    lr: 0.0001
     weight_decay: 0.0001
 
 lr_policy:
   name: 'ReduceLROnPlateau'
   params:
     mode: 'max'
-    patience: 5
+    patience: 3

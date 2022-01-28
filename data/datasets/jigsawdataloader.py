@@ -91,7 +91,7 @@ class JigsawDataloader(Dataset):
             self.id = self.df['id'].to_numpy()
             self.inputs = self.df['comment_text']
             self.make_outputs()
-            self.outputs = self.df['y'].to_numpy()
+            self.outputs = self.df['y'].to_numpy().astype(np.float32)
         elif self.split == 'val':
             self.id = [0] * len(self.df)
             self.inputs = self.df['less_toxic'], self.df['more_toxic']
@@ -104,12 +104,13 @@ class JigsawDataloader(Dataset):
         self.clean_text()
 
     def clean_text(self):
+        logging.info('Cleaning data')
         if self.config.clean_text:
             if self.split == 'train' or self.split == 'test':
                 self.inputs = self.inputs.progress_apply(clean)
             elif self.split == 'val':  # todo: change it
-                self.inputs = self.inputs[:, 0].progress_apply(clean), \
-                              self.inputs[:, 1].progress_apply(clean)
+                self.inputs = self.inputs[0].progress_apply(clean), \
+                              self.inputs[1].progress_apply(clean)
             else:
                 raise ValueError(f'Wrong split: {self.split}')
 

@@ -1,0 +1,28 @@
+id: "bert_hpo"
+base_config: 'transformer'
+hpo:
+  num_samples: 30
+  cpu_per_trial: 8
+  gpu_per_trial: 0.5
+  hpo_algorithm:
+    name: 'SkOptSearch'
+    params:
+      mode: 'max'
+
+data:
+  params:
+    balanced_classes: ['choice', [['', 'true']]]
+    batch_size: ['uniform', [5, 20]]
+    clean_text: ['choice', [['', 'true']]]
+
+model:
+  name: 'bert-base-uncased'
+
+optimizer:
+  name: ['choice', [['Adam', 'RAdam', 'Ranger']]]
+  params:
+    lr: ['loguniform', [0.00001, 0.001]]
+    weight_decay: ['loguniform', [0.000001, 0.001]]
+
+loss:
+  name: ['choice', [['L1Loss', 'MSELoss']]]
